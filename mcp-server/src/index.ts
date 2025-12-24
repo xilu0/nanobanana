@@ -10,10 +10,6 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import express from 'express';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import * as toml from 'toml';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -587,39 +583,244 @@ class NanoBananaServer {
     });
   }
 
-  private setupPromptHandlers() {
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = path.dirname(__filename);
-    // Commands directory is located one level above the server's root in the extension
-    const commandsDir = path.resolve(__dirname, '../../commands');
 
+  // Prompt definitions hardcoded to avoid file system dependency issues in different environments
+  private readonly PROMPT_DEFINITIONS: Record<string, { description: string; prompt: string }> = {
+    generate: {
+      description: 'Generate single or multiple images from a text prompt with optional style and variation controls.',
+      prompt: `
+You are a command parser for the nanobanana generate command. You must validate arguments and return structured data.
+
+Valid options:
+- --count=N (1-8, default: 1)
+- --styles="style1,style2" (photorealistic, watercolor, oil-painting, sketch, pixel-art, anime, vintage, modern, abstract, minimalist)
+- --variations="var1,var2" (lighting, angle, color-palette, composition, mood, season, time-of-day)
+- --format=grid|separate (default: separate)
+- --seed=123 (integer)
+- --preview (flag)
+
+User input: {{args}}
+
+Parse this input and:
+1. Extract the main prompt (text before any options)
+2. Validate all options against allowed values
+3. If any options are invalid, return an error message listing the invalid options and their allowed values
+4. If valid, call the generate_image tool with the parsed parameters
+
+If you find invalid options, respond with:
+"Error: Invalid option(s) found: [list invalid options]. Valid options are: --count (1-8), --styles (comma-separated list from: photorealistic, watercolor, oil-painting, sketch, pixel-art, anime, vintage, modern, abstract, minimalist), --variations (comma-separated list from: lighting, angle, color-palette, composition, mood, season, time-of-day), --format (grid or separate), --seed (integer), --preview (flag)"
+
+Otherwise, call generate_image with the validated parameters.
+`,
+    },
+    edit: {
+      description: 'Edit an existing image based on a text prompt.',
+      prompt: `
+You are a command parser for the nanobanana edit command. You must validate arguments and return structured data.
+
+Valid options:
+- --preview (flag)
+
+User input: {{args}}
+
+Parse this input and:
+1. Extract the filename (first argument, required)
+2. Extract the edit prompt (text after filename, before options, required)
+3. Validate all options against allowed values
+4. If any options are invalid, return an error message listing the invalid options
+5. If required parameters are missing, return an error message
+6. If valid, call the edit_image tool with the parsed parameters
+
+Required format: filename "edit instructions" [--preview]
+
+If you find invalid options, respond with:
+"Error: Invalid option(s) found: [list invalid options]. Valid options are: --preview (flag)"
+
+If missing required parameters, respond with:
+"Error: Missing required parameters. Usage: /edit filename \\"edit instructions\\" [--preview]"
+
+Otherwise, call edit_image with file and prompt parameters.
+`,
+    },
+    icon: {
+      description: 'Generate app icons, favicons, and UI elements in multiple sizes and formats.',
+      prompt: `
+You are a command parser for the nanobanana icon command. You must validate arguments and return structured data.
+
+Valid options:
+- --sizes="16,32,64" (comma-separated list of valid sizes: 16, 32, 64, 128, 256, 512, 1024)
+- --type="app-icon|favicon|ui-element" (default: app-icon)
+- --style="flat|skeuomorphic|minimal|modern" (default: modern)
+- --format="png|jpeg" (default: png)
+- --background="transparent|white|black" or color name (default: transparent)
+- --corners="rounded|sharp" (default: rounded)
+- --preview (flag)
+
+User input: {{args}}
+
+Parse this input and:
+1. Extract the main prompt (text before any options, required)
+2. Validate all options against allowed values
+3. For --sizes, ensure all values are valid integers from the allowed list
+4. If any options are invalid, return an error message listing the invalid options and their allowed values
+5. If valid, call the generate_icon tool with the parsed parameters
+
+If you find invalid options, respond with:
+"Error: Invalid option(s) found: [list invalid options]. Valid options are: --sizes (comma-separated from: 16, 32, 64, 128, 256, 512, 1024), --type (app-icon, favicon, ui-element), --style (flat, skeuomorphic, minimal, modern), --format (png, jpeg), --background (transparent, white, black, or color name), --corners (rounded, sharp), --preview (flag)"
+
+Otherwise, call generate_icon with the validated parameters.
+`,
+    },
+    pattern: {
+      description: 'Generate seamless patterns and textures for backgrounds and design elements.',
+      prompt: `
+You are a command parser for the nanobanana pattern command. You must validate arguments and return structured data.
+
+Valid options:
+- --size="WxH" (common: 128x128, 256x256, 512x512, default: 256x256)
+- --type="seamless|texture|wallpaper" (default: seamless)
+- --style="geometric|organic|abstract|floral|tech" (default: abstract)
+- --density="sparse|medium|dense" (default: medium)
+- --colors="mono|duotone|colorful" (default: colorful)
+- --repeat="tile|mirror" (default: tile)
+- --preview (flag)
+
+User input: {{args}}
+
+Parse this input and:
+1. Extract the main prompt (text before any options, required)
+2. Validate all options against allowed values
+3. For --size, ensure format is valid (e.g., "256x256")
+4. If any options are invalid, return an error message listing the invalid options and their allowed values
+5. If valid, call the generate_pattern tool with the parsed parameters
+
+If you find invalid options, respond with:
+"Error: Invalid option(s) found: [list invalid options]. Valid options are: --size (format: WxH, e.g., 256x256), --type (seamless, texture, wallpaper), --style (geometric, organic, abstract, floral, tech), --density (sparse, medium, dense), --colors (mono, duotone, colorful), --repeat (tile, mirror), --preview (flag)"
+
+Otherwise, call generate_pattern with the validated parameters.
+`,
+    },
+    story: {
+      description: 'Generate a sequence of related images that tell a visual story or show a process step-by-step.',
+      prompt: `
+You are a command parser for the nanobanana story command. You must validate arguments and return structured data.
+
+Valid options:
+- --steps=N (2-8, default: 4)
+- --type="story|process|tutorial|timeline" (default: story)
+- --style="consistent|evolving" (default: consistent)
+- --layout="separate|grid|comic" (default: separate)
+- --transition="smooth|dramatic|fade" (default: smooth)
+- --format="storyboard|individual" (default: individual)
+- --preview (flag)
+
+User input: {{args}}
+
+Parse this input and:
+1. Extract the main prompt (text before any options, required)
+2. Validate all options against allowed values
+3. For --steps, ensure value is integer between 2-8
+4. If any options are invalid, return an error message listing the invalid options and their allowed values
+5. If valid, call the generate_story tool with the parsed parameters
+
+If you find invalid options, respond with:
+"Error: Invalid option(s) found: [list invalid options]. Valid options are: --steps (2-8), --type (story, process, tutorial, timeline), --style (consistent, evolving), --layout (separate, grid, comic), --transition (smooth, dramatic, fade), --format (storyboard, individual), --preview (flag)"
+
+Otherwise, call generate_story with the validated parameters.
+`,
+    },
+    diagram: {
+      description: 'Generate technical diagrams, flowcharts, and architectural mockups from text descriptions.',
+      prompt: `
+You are a command parser for the nanobanana diagram command. You must validate arguments and return structured data.
+
+Valid options:
+- --type="flowchart|database|mindmap|architecture" (default: flowchart)
+- --complexity="simple|detailed|comprehensive" (default: detailed)
+- --style="professional|hand-drawn|minimal" (default: professional)
+- --layout="horizontal|vertical|circular" (default: vertical)
+- --format="png|svg" (default: png)
+- --preview (flag)
+
+User input: {{args}}
+
+Parse this input and:
+1. Extract the main prompt (text before any options, required)
+2. Validate all options against allowed values
+3. If any options are invalid, return an error message listing the invalid options and their allowed values
+4. If valid, call the generate_diagram tool with the parsed parameters
+
+If you find invalid options, respond with:
+"Error: Invalid option(s) found: [list invalid options]. Valid options are: --type (flowchart, database, mindmap, architecture), --complexity (simple, detailed, comprehensive), --style (professional, hand-drawn, minimal), --layout (horizontal, vertical, circular), --format (png, svg), --preview (flag)"
+
+Otherwise, call generate_diagram with the validated parameters.
+`,
+    },
+    restore: {
+      description: 'Restore or enhance an existing image.',
+      prompt: `
+You are a command parser for the nanobanana restore command. You must validate arguments and return structured data.
+
+Valid options:
+- --preview (flag)
+
+User input: {{args}}
+
+Parse this input and:
+1. Extract the filename (first argument, required)
+2. Extract the restoration prompt (text after filename, before options, required)
+3. Validate all options against allowed values
+4. If any options are invalid, return an error message listing the invalid options
+5. If required parameters are missing, return an error message
+6. If valid, call the restore_image tool with the parsed parameters
+
+Required format: filename "restoration instructions" [--preview]
+
+If you find invalid options, respond with:
+"Error: Invalid option(s) found: [list invalid options]. Valid options are: --preview (flag)"
+
+If missing required parameters, respond with:
+"Error: Missing required parameters. Usage: /restore filename \\"restoration instructions\\" [--preview]"
+
+Otherwise, call restore_image with file and prompt parameters.
+`,
+    },
+    nanobanana: {
+      description: 'Generate and manipulate images with Nano Banana using natural language prompts.',
+      prompt: `
+Please use the nanobanana MCP server tools to help with image generation and manipulation tasks based on the user's natural language request.
+
+Analyze the user request and determine the most appropriate tool:
+
+- For single/multiple image generation: use generate_image tool
+- For editing existing images: use edit_image tool
+- For restoring/enhancing images: use restore_image tool
+- For app icons, favicons, UI elements: use generate_icon tool
+- For seamless patterns, textures, backgrounds: use generate_pattern tool
+- For visual stories, sequences, tutorials: use generate_story tool
+- For technical diagrams, flowcharts, architecture: use generate_diagram tool
+
+Be intelligent about interpreting the user's intent from their natural language description and select the most specialized tool available.
+
+User request: {{args}}
+`,
+    },
+  };
+
+  private setupPromptHandlers() {
     this.server.setRequestHandler(ListPromptsRequestSchema, async () => {
       try {
-        if (!fs.existsSync(commandsDir)) {
-          console.error(`Commands directory not found: ${commandsDir}`);
-          return { prompts: [] };
-        }
-
-        const files = fs.readdirSync(commandsDir);
-        const prompts = files
-          .filter((file) => file.endsWith('.toml'))
-          .map((file) => {
-            const content = fs.readFileSync(path.join(commandsDir, file), 'utf-8');
-            const data = toml.parse(content);
-            const name = path.basename(file, '.toml');
-
-            return {
-              name,
-              description: data.description || `Nano Banana ${name} command`,
-              arguments: [
-                {
-                  name: 'args',
-                  description: 'Command arguments and prompt',
-                  required: true,
-                },
-              ],
-            };
-          });
+        const prompts = Object.entries(this.PROMPT_DEFINITIONS).map(([name, def]) => ({
+          name,
+          description: def.description,
+          arguments: [
+            {
+              name: 'args',
+              description: 'Command arguments and prompt',
+              required: true,
+            },
+          ],
+        }));
 
         return { prompts };
       } catch (error) {
@@ -630,22 +831,20 @@ class NanoBananaServer {
 
     this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
-      const tomlPath = path.join(commandsDir, `${name}.toml`);
+      const definition = this.PROMPT_DEFINITIONS[name];
 
-      if (!fs.existsSync(tomlPath)) {
+      if (!definition) {
         throw new Error(`Prompt not found: ${name}`);
       }
 
       try {
-        const content = fs.readFileSync(tomlPath, 'utf-8');
-        const data = toml.parse(content);
         const userArgs = (args?.args as string) || '';
 
         // Support both {{args}} and {{ args }}
-        const promptText = (data.prompt || '').replace(/\{\{\s*args\s*\}\}/g, userArgs);
+        const promptText = (definition.prompt || '').replace(/\{\{\s*args\s*\}\}/g, userArgs);
 
         return {
-          description: data.description,
+          description: definition.description,
           messages: [
             {
               role: 'user',

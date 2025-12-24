@@ -33,10 +33,7 @@ RUN npm ci --omit=dev --ignore-scripts
 # Copy built files from builder stage
 COPY --from=builder /app/mcp-server/dist ./mcp-server/dist
 
-# Copy commands for prompts support
-# The server logic expects commands at ../../commands relative to /app/mcp-server/dist/index.js
-# path.resolve('/app/mcp-server/dist', '../../commands') -> /app/commands
-COPY --from=builder /app/commands /app/commands
+
 
 # Create a directory for image outputs
 RUN mkdir -p outputs && chmod 777 outputs

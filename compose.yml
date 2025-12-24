@@ -1,8 +1,7 @@
 services:
   nanobanana-mcp:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: heishui/nanobanana-mcp:prod
+    pull_policy: always
     container_name: nanobanana-mcp
     ports:
       - "${PORT:-3000}:3000"
