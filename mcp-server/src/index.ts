@@ -739,6 +739,10 @@ class NanoBananaServer {
       const app = express();
       let transport: SSEServerTransport | null = null;
 
+      app.get('/health', (req, res) => {
+        res.status(200).send('OK');
+      });
+
       app.get('/sse', async (req: express.Request, res: express.Response) => {
         console.error('New SSE connection');
         transport = new SSEServerTransport('/messages', res);
