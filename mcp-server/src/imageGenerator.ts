@@ -18,17 +18,19 @@ import { promisify } from 'util';
 const execAsync = promisify(exec);
 
 export class ImageGenerator {
-  private ai: GoogleGenAI;
+  private ai?: GoogleGenAI;
   private modelName: string;
   private static readonly DEFAULT_MODEL = 'gemini-3-pro-image-preview';
 
-  constructor(authConfig: AuthConfig) {
-    this.ai = new GoogleGenAI({
-      apiKey: authConfig.apiKey,
-      httpOptions: process.env.NANOBANANA_BASE_URL
-        ? { baseUrl: process.env.NANOBANANA_BASE_URL }
-        : undefined,
-    });
+  constructor(authConfig?: AuthConfig) {
+    if (authConfig?.apiKey) {
+      this.ai = new GoogleGenAI({
+        apiKey: authConfig.apiKey,
+        httpOptions: process.env.NANOBANANA_BASE_URL
+          ? { baseUrl: process.env.NANOBANANA_BASE_URL }
+          : undefined,
+      });
+    }
     this.modelName =
       process.env.NANOBANANA_MODEL || ImageGenerator.DEFAULT_MODEL;
     console.error(`DEBUG - Using image model: ${this.modelName}`);
@@ -106,39 +108,11 @@ export class ImageGenerator {
     await Promise.all(previewPromises);
   }
 
-  static validateAuthentication(): AuthConfig {
-    const nanoGeminiKey = process.env.NANOBANANA_GEMINI_API_KEY;
-    if (nanoGeminiKey) {
-      console.error('✓ Found NANOBANANA_GEMINI_API_KEY environment variable');
-      return { apiKey: nanoGeminiKey, keyType: 'GEMINI_API_KEY' };
-    }
-
-    const nanoGoogleKey = process.env.NANOBANANA_GOOGLE_API_KEY;
-    if (nanoGoogleKey) {
-      console.error('✓ Found NANOBANANA_GOOGLE_API_KEY environment variable');
-      return { apiKey: nanoGoogleKey, keyType: 'GOOGLE_API_KEY' };
-    }
-
-    const geminiKey = process.env.GEMINI_API_KEY;
-    if (geminiKey) {
-      console.error(
-        '✓ Found GEMINI_API_KEY environment variable (fallback)',
-      );
-      return { apiKey: geminiKey, keyType: 'GEMINI_API_KEY' };
-    }
-
-    const googleKey = process.env.GOOGLE_API_KEY;
-    if (googleKey) {
-      console.error(
-        '✓ Found GOOGLE_API_KEY environment variable (fallback)',
-      );
-      return { apiKey: googleKey, keyType: 'GOOGLE_API_KEY' };
-    }
-
-    throw new Error(
-      'ERROR: No valid API key found. Please set NANOBANANA_GEMINI_API_KEY, NANOBANANA_GOOGLE_API_KEY, GEMINI_API_KEY, or GOOGLE_API_KEY environment variable.\n' +
-      'For more details on authentication, visit: https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/authentication.md',
-    );
+  static validateAuthentication(): AuthConfig | undefined {
+    // Pure BYOK mode: Server does not provide or detect any API keys.
+    // Client must provide the key per request via the 'apiKey' tool argument.
+    console.error('! Server running in Pure BYOK Mode. All tool calls must provide an apiKey.');
+    return undefined;
   }
 
   private isValidBase64ImageData(data: string): boolean {
@@ -245,10 +219,33 @@ export class ImageGenerator {
     return prompts.length > 0 ? prompts : [basePrompt];
   }
 
+  private getAiClient(requestApiKey?: string): GoogleGenAI {
+    if (requestApiKey) {
+      return new GoogleGenAI({
+        apiKey: requestApiKey,
+        httpOptions: process.env.NANOBANANA_BASE_URL
+          ? { baseUrl: process.env.NANOBANANA_BASE_URL }
+          : undefined,
+      });
+    }
+
+    if (!this.ai) {
+      throw new Error(
+        'Authentication Required: No API key found. Please provide an API key via the `apiKey` argument. ' +
+        'Supported tokens: ANTHROPIC_AUTH_TOKEN, GOOGLE_CLOUD_ACCESS_TOKEN, or GEMINI_API_KEY. ' +
+        'If you are the user, please provide one of these tokens to the AI.',
+      );
+    }
+
+    return this.ai;
+  }
+
   async generateTextToImage(
     request: ImageGenerationRequest,
+    args?: { apiKey?: string },
   ): Promise<ImageGenerationResponse> {
     try {
+      const aiClient = this.getAiClient(args?.apiKey);
       const outputPath = FileHandler.ensureOutputDirectory();
       const generatedFiles: string[] = [];
       const prompts = this.buildBatchPrompts(request);
@@ -265,7 +262,7 @@ export class ImageGenerator {
 
         try {
           // Make API call for each variation
-          const response = await this.ai.models.generateContent({
+          const response = await aiClient.models.generateContent({
             model: this.modelName,
             contents: [
               {
@@ -409,9 +406,10 @@ export class ImageGenerator {
 
   async generateStorySequence(
     request: ImageGenerationRequest,
-    args?: StorySequenceArgs,
+    args?: StorySequenceArgs & { apiKey?: string },
   ): Promise<ImageGenerationResponse> {
     try {
+      const aiClient = this.getAiClient(args?.apiKey);
       const outputPath = FileHandler.ensureOutputDirectory();
       const generatedFiles: string[] = [];
       const steps = request.outputCount || 4;
@@ -451,7 +449,7 @@ export class ImageGenerator {
         console.error(`DEBUG - Generating step ${stepNumber}: ${stepPrompt}`);
 
         try {
-          const response = await this.ai.models.generateContent({
+          const response = await aiClient.models.generateContent({
             model: this.modelName,
             contents: [
               {
@@ -550,8 +548,10 @@ export class ImageGenerator {
   }
   async editImage(
     request: ImageGenerationRequest,
+    args?: { apiKey?: string },
   ): Promise<ImageGenerationResponse> {
     try {
+      const aiClient = this.getAiClient(args?.apiKey);
       if (!request.inputImage) {
         return {
           success: false,
@@ -574,7 +574,7 @@ export class ImageGenerator {
         fileResult.filePath!,
       );
 
-      const response = await this.ai.models.generateContent({
+      const response = await aiClient.models.generateContent({
         model: this.modelName,
         contents: [
           {

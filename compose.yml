@@ -1,0 +1,23 @@
+services:
+  nanobanana-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nanobanana-mcp
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - TRANSPORT=sse
+      - PORT=3000
+      - NANOBANANA_MODEL=gemini-3-pro-image-preview
+      - NANOBANANA_BASE_URL=https://claude-code.club/gemini
+      - NODE_ENV=production
+    volumes:
+      - ./outputs:/app/outputs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/sse"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

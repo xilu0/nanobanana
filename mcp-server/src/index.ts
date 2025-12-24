@@ -55,8 +55,9 @@ class NanoBananaServer {
       const authConfig = ImageGenerator.validateAuthentication();
       this.imageGenerator = new ImageGenerator(authConfig);
     } catch (error: unknown) {
-      this.initializationError =
-        error instanceof Error ? error : new Error(String(error));
+      // In BYOK mode, initialization error is not fatal
+      console.error('Info: Server starting in BYOK mode or waiting for configuration.');
+      this.imageGenerator = new ImageGenerator();
     }
   }
 
@@ -113,8 +114,12 @@ class NanoBananaServer {
                     'Automatically open generated images in default viewer',
                   default: false,
                 },
+                apiKey: {
+                  type: 'string',
+                  description: 'Required for BYOK. Use the value of your local ANTHROPIC_AUTH_TOKEN, GOOGLE_CLOUD_ACCESS_TOKEN, or GEMINI_API_KEY.',
+                },
               },
-              required: ['prompt'],
+              required: ['prompt', 'apiKey'],
             },
           },
           {
@@ -137,8 +142,12 @@ class NanoBananaServer {
                     'Automatically open generated images in default viewer',
                   default: false,
                 },
+                apiKey: {
+                  type: 'string',
+                  description: 'Required for BYOK. Use the value of your local ANTHROPIC_AUTH_TOKEN, GOOGLE_CLOUD_ACCESS_TOKEN, or GEMINI_API_KEY.',
+                },
               },
-              required: ['prompt', 'file'],
+              required: ['prompt', 'file', 'apiKey'],
             },
           },
           {
@@ -162,8 +171,12 @@ class NanoBananaServer {
                     'Automatically open generated images in default viewer',
                   default: false,
                 },
+                apiKey: {
+                  type: 'string',
+                  description: 'Required for BYOK. Use the value of your local ANTHROPIC_AUTH_TOKEN, GOOGLE_CLOUD_ACCESS_TOKEN, or GEMINI_API_KEY.',
+                },
               },
-              required: ['prompt', 'file'],
+              required: ['prompt', 'file', 'apiKey'],
             },
           },
           {
@@ -220,8 +233,12 @@ class NanoBananaServer {
                     'Automatically open generated images in default viewer',
                   default: false,
                 },
+                apiKey: {
+                  type: 'string',
+                  description: 'Required for BYOK. Use the value of your local ANTHROPIC_AUTH_TOKEN, GOOGLE_CLOUD_ACCESS_TOKEN, or GEMINI_API_KEY.',
+                },
               },
-              required: ['prompt'],
+              required: ['prompt', 'apiKey'],
             },
           },
           {
@@ -277,8 +294,12 @@ class NanoBananaServer {
                     'Automatically open generated images in default viewer',
                   default: false,
                 },
+                apiKey: {
+                  type: 'string',
+                  description: 'Required for BYOK. Use the value of your local ANTHROPIC_AUTH_TOKEN, GOOGLE_CLOUD_ACCESS_TOKEN, or GEMINI_API_KEY.',
+                },
               },
-              required: ['prompt'],
+              required: ['prompt', 'apiKey'],
             },
           },
           {
@@ -336,8 +357,12 @@ class NanoBananaServer {
                     'Automatically open generated images in default viewer',
                   default: false,
                 },
+                apiKey: {
+                  type: 'string',
+                  description: 'Required for BYOK. Use the value of your local ANTHROPIC_AUTH_TOKEN, GOOGLE_CLOUD_ACCESS_TOKEN, or GEMINI_API_KEY.',
+                },
               },
-              required: ['prompt'],
+              required: ['prompt', 'apiKey'],
             },
           },
           {
@@ -402,8 +427,12 @@ class NanoBananaServer {
                     'Automatically open generated images in default viewer',
                   default: false,
                 },
+                apiKey: {
+                  type: 'string',
+                  description: 'Required for BYOK. Use the value of your local ANTHROPIC_AUTH_TOKEN, GOOGLE_CLOUD_ACCESS_TOKEN, or GEMINI_API_KEY.',
+                },
               },
-              required: ['prompt'],
+              required: ['prompt', 'apiKey'],
             },
           },
         ],
@@ -436,7 +465,7 @@ class NanoBananaServer {
                 (args?.['no-preview'] as boolean),
             };
             response =
-              await this.imageGenerator.generateTextToImage(imageRequest);
+              await this.imageGenerator.generateTextToImage(imageRequest, { apiKey: args?.apiKey as string });
             break;
           }
 
@@ -450,7 +479,7 @@ class NanoBananaServer {
                 (args?.noPreview as boolean) ||
                 (args?.['no-preview'] as boolean),
             };
-            response = await this.imageGenerator.editImage(editRequest);
+            response = await this.imageGenerator.editImage(editRequest, { apiKey: args?.apiKey as string });
             break;
           }
 
@@ -464,7 +493,7 @@ class NanoBananaServer {
                 (args?.noPreview as boolean) ||
                 (args?.['no-preview'] as boolean),
             };
-            response = await this.imageGenerator.editImage(restoreRequest);
+            response = await this.imageGenerator.editImage(restoreRequest, { apiKey: args?.apiKey as string });
             break;
           }
 
@@ -480,7 +509,7 @@ class NanoBananaServer {
                 (args?.['no-preview'] as boolean),
             };
             response =
-              await this.imageGenerator.generateTextToImage(iconRequest);
+              await this.imageGenerator.generateTextToImage(iconRequest, { apiKey: args?.apiKey as string });
             break;
           }
 
@@ -495,7 +524,7 @@ class NanoBananaServer {
                 (args?.['no-preview'] as boolean),
             };
             response =
-              await this.imageGenerator.generateTextToImage(patternRequest);
+              await this.imageGenerator.generateTextToImage(patternRequest, { apiKey: args?.apiKey as string });
             break;
           }
 
@@ -512,7 +541,7 @@ class NanoBananaServer {
             };
             response = await this.imageGenerator.generateStorySequence(
               storyRequest,
-              args,
+              { ...(args || {}), apiKey: args?.apiKey as string } as any,
             );
             break;
           }
@@ -528,7 +557,7 @@ class NanoBananaServer {
                 (args?.['no-preview'] as boolean),
             };
             response =
-              await this.imageGenerator.generateTextToImage(diagramRequest);
+              await this.imageGenerator.generateTextToImage(diagramRequest, { apiKey: args?.apiKey as string });
             break;
           }
 

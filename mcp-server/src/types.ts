@@ -29,7 +29,11 @@ export interface ImageGenerationResponse {
 
 export interface AuthConfig {
   apiKey: string;
-  keyType: 'GEMINI_API_KEY' | 'GOOGLE_API_KEY';
+  keyType:
+  | 'GEMINI_API_KEY'
+  | 'GOOGLE_API_KEY'
+  | 'ANTHROPIC_AUTH_TOKEN'
+  | 'GOOGLE_CLOUD_ACCESS_TOKEN';
 }
 
 export interface FileSearchResult {
