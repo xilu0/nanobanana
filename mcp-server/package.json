@@ -15,7 +15,8 @@
   "dependencies": {
     "@google/genai": "^1.17.0",
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "express": "^4.19.0"
+    "express": "^4.19.0",
+    "toml": "^3.0.0"
   },
   "devDependencies": {
     "@types/express": "^4.17.0",

@@ -10,9 +10,15 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import express from 'express';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import * as toml from 'toml';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
+  ListPromptsRequestSchema,
+  GetPromptRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { ImageGenerator } from './imageGenerator.js';
 import {
@@ -36,11 +42,13 @@ class NanoBananaServer {
       {
         capabilities: {
           tools: {},
+          prompts: {},
         },
       },
     );
 
     this.setupToolHandlers();
+    this.setupPromptHandlers();
     this.setupErrorHandling();
 
     try {
@@ -546,6 +554,82 @@ class NanoBananaServer {
           throw error;
         }
         throw new Error(`An unexpected error occurred: ${String(error)}`);
+      }
+    });
+  }
+
+  private setupPromptHandlers() {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+    // Commands directory is located one level above the server's root in the extension
+    const commandsDir = path.resolve(__dirname, '../../commands');
+
+    this.server.setRequestHandler(ListPromptsRequestSchema, async () => {
+      try {
+        if (!fs.existsSync(commandsDir)) {
+          console.error(`Commands directory not found: ${commandsDir}`);
+          return { prompts: [] };
+        }
+
+        const files = fs.readdirSync(commandsDir);
+        const prompts = files
+          .filter((file) => file.endsWith('.toml'))
+          .map((file) => {
+            const content = fs.readFileSync(path.join(commandsDir, file), 'utf-8');
+            const data = toml.parse(content);
+            const name = path.basename(file, '.toml');
+
+            return {
+              name,
+              description: data.description || `Nano Banana ${name} command`,
+              arguments: [
+                {
+                  name: 'args',
+                  description: 'Command arguments and prompt',
+                  required: true,
+                },
+              ],
+            };
+          });
+
+        return { prompts };
+      } catch (error) {
+        console.error('Error listing prompts:', error);
+        return { prompts: [] };
+      }
+    });
+
+    this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+      const { name, arguments: args } = request.params;
+      const tomlPath = path.join(commandsDir, `${name}.toml`);
+
+      if (!fs.existsSync(tomlPath)) {
+        throw new Error(`Prompt not found: ${name}`);
+      }
+
+      try {
+        const content = fs.readFileSync(tomlPath, 'utf-8');
+        const data = toml.parse(content);
+        const userArgs = (args?.args as string) || '';
+
+        // Support both {{args}} and {{ args }}
+        const promptText = (data.prompt || '').replace(/\{\{\s*args\s*\}\}/g, userArgs);
+
+        return {
+          description: data.description,
+          messages: [
+            {
+              role: 'user',
+              content: {
+                type: 'text',
+                text: promptText,
+              },
+            },
+          ],
+        };
+      } catch (error) {
+        console.error(`Error getting prompt ${name}:`, error);
+        throw new Error(`Failed to load prompt ${name}`);
       }
     });
   }
