@@ -3,18 +3,18 @@ FROM node:22-slim AS builder
 
 WORKDIR /app
 
-# Copy mcp-server package files first for better caching
+# Copy mcp-server package files
 COPY mcp-server/package*.json ./mcp-server/
 
-# Install all dependencies for the server
+# Install all dependencies for the server, ignoring scripts to avoid premature build
 WORKDIR /app/mcp-server
-RUN npm ci
+RUN npm ci --ignore-scripts
 
-# Copy the rest of the repository source code
+# Copy the rest of the repository source code (excluding what's in .dockerignore)
 WORKDIR /app
 COPY . .
 
-# Build TypeScript code
+# Build TypeScript code explicitly after source code is copied
 WORKDIR /app/mcp-server
 RUN npm run build
 
