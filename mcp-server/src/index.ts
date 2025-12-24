@@ -562,13 +562,38 @@ class NanoBananaServer {
         }
 
         if (response.success) {
+          const content: any[] = [
+            {
+              type: 'text',
+              text: `${response.message}\n\nGenerated files:\n${response.generatedFiles?.map((f) => `• ${f}`).join('\n') || 'None'}`,
+            },
+          ];
+
+          if (response.generatedFiles && response.generatedFiles.length > 0) {
+            const fs = await import('fs');
+            const path = await import('path');
+            const { FileHandler } = await import('./fileHandler.js');
+
+            for (const file of response.generatedFiles) {
+              try {
+                const mimeType = file.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+                const base64Data = await FileHandler.readImageAsBase64(file);
+
+                content.push({
+                  type: 'image',
+                  data: base64Data,
+                  mimeType: mimeType,
+                });
+              } catch (error) {
+                console.error(`Failed to read image file ${file}:`, error);
+                // Don't fail the whole request if one image fails to load, just log it
+                content[0].text += `\n\nWarning: Failed to load image content for ${path.basename(file)}`;
+              }
+            }
+          }
+
           return {
-            content: [
-              {
-                type: 'text',
-                text: `${response.message}\n\nGenerated files:\n${response.generatedFiles?.map((f) => `• ${f}`).join('\n') || 'None'}`,
-              },
-            ],
+            content,
           };
         } else {
           throw new Error(response.error || response.message);
