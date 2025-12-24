@@ -43,6 +43,13 @@ export class ImageGenerator {
 
   private async openImagePreview(filePath: string): Promise<void> {
     try {
+      // Check for Docker environment
+      const fs = await import('fs');
+      if (fs.existsSync('/.dockerenv')) {
+        console.error(`DEBUG - Preview skipped: Running in Docker container (file: ${filePath})`);
+        return;
+      }
+
       const platform = process.platform;
       let command: string;
 
