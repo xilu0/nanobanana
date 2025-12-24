@@ -14,6 +14,11 @@ A professional Gemini CLI extension for generating and manipulating images using
 - **🔧 Image Restoration**: Restore and enhance old or damaged photos
 - **📁 Smart File Management**: User-friendly filenames with automatic duplicate prevention
 
+## 📚 Documentation
+
+- [**Getting Started Guide**](docs/getstart.md) ([中文版](docs/getstart_CN.md)) - **Required for Claude Code / BYOK users**
+- [MCP Prompts Support](docs/prompts.md) - Using Nano Banana as an MCP prompt library
+
 ## 📋 Prerequisites
 
 1. **Gemini CLI** installed and configured
