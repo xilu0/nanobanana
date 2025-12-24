@@ -34,8 +34,9 @@ RUN npm ci --omit=dev --ignore-scripts
 COPY --from=builder /app/mcp-server/dist ./mcp-server/dist
 
 # Copy commands for prompts support
-# The server logic expects commands at ../../commands relative to dist/index.js
-COPY --from=builder /app/commands /commands
+# The server logic expects commands at ../../commands relative to /app/mcp-server/dist/index.js
+# path.resolve('/app/mcp-server/dist', '../../commands') -> /app/commands
+COPY --from=builder /app/commands /app/commands
 
 # Create a directory for image outputs
 RUN mkdir -p outputs && chmod 777 outputs
@@ -50,6 +51,6 @@ ENV NANOBANANA_BASE_URL=
 EXPOSE 3000
 
 # Start the server
-# Path matches the structure: /app/mcp-server/dist/index.js
-# commandsDir in index.ts: path.resolve(__dirname, '../../commands') -> /commands
+# Path: /app/mcp-server/dist/index.js
+# commandsDir: path.resolve('/app/mcp-server/dist', '../../commands') -> /app/commands
 CMD ["node", "mcp-server/dist/index.js"]

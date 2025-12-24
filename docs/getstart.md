@@ -20,7 +20,7 @@ Nano Banana follows a **Pure Bring Your Own Key (BYOK)** architecture:
 #### Installation
 Run the following command in your terminal:
 ```bash
-claude mcp add nanobanana https://nanobanana.ai-code.club/sse
+claude mcp add --transport sse nanobanana https://nanobanana.ai-code.club/sse
 ```
 
 #### Authentication

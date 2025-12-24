@@ -20,7 +20,7 @@ Nano Banana 采用 **纯客户端鉴权 (Pure Bring Your Own Key / BYOK)** 架�
 #### 安装
 在您的终端中运行以下命令：
 ```bash
-claude mcp add nanobanana https://nanobanana.ai-code.club/sse
+claude mcp add --transport sse nanobanana https://nanobanana.ai-code.club/sse
 ```
 
 #### 身份验证
