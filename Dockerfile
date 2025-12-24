@@ -28,7 +28,7 @@ COPY mcp-server/package*.json ./mcp-server/
 
 # Install only production dependencies
 WORKDIR /app/mcp-server
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --ignore-scripts
 
 # Copy built files from builder stage
 COPY --from=builder /app/mcp-server/dist ./mcp-server/dist
