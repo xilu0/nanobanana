@@ -36,6 +36,7 @@ RUN mkdir -p outputs && chmod 777 outputs
 ENV TRANSPORT=sse
 ENV PORT=3000
 ENV NODE_ENV=production
+ENV NANOBANANA_BASE_URL=
 
 # Expose the port
 EXPOSE 3000
