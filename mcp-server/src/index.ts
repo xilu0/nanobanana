@@ -8,6 +8,8 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import express from 'express';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -531,7 +533,7 @@ class NanoBananaServer {
             content: [
               {
                 type: 'text',
-                text: `${response.message}\n\nGenerated files:\n${response.generatedFiles?.map((f) => `• ${f}`).join('\n') || 'None'}`, 
+                text: `${response.message}\n\nGenerated files:\n${response.generatedFiles?.map((f) => `• ${f}`).join('\n') || 'None'}`,
               },
             ],
           };
@@ -618,9 +620,37 @@ class NanoBananaServer {
   }
 
   async run() {
-    const transport = new StdioServerTransport();
-    await this.server.connect(transport);
-    console.error('Nano Banana MCP server running on stdio');
+    const transportType = process.env.TRANSPORT || 'stdio';
+
+    if (transportType === 'sse') {
+      const app = express();
+      let transport: SSEServerTransport | null = null;
+
+      app.get('/sse', async (req: express.Request, res: express.Response) => {
+        console.error('New SSE connection');
+        transport = new SSEServerTransport('/messages', res);
+        await this.server.connect(transport);
+      });
+
+      app.post('/messages', async (req: express.Request, res: express.Response) => {
+        if (transport) {
+          await transport.handlePostMessage(req, res);
+        } else {
+          res.status(400).send('No active SSE session');
+        }
+      });
+
+      const port = process.env.PORT || 3000;
+      app.listen(port, () => {
+        console.error(`Nano Banana MCP server running on SSE at http://localhost:${port}`);
+        console.error(`SSE endpoint: http://localhost:${port}/sse`);
+        console.error(`Message endpoint: http://localhost:${port}/messages`);
+      });
+    } else {
+      const transport = new StdioServerTransport();
+      await this.server.connect(transport);
+      console.error('Nano Banana MCP server running on stdio');
+    }
   }
 }
 
