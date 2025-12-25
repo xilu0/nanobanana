@@ -565,7 +565,7 @@ class NanoBananaServer {
           const content: any[] = [
             {
               type: 'text',
-              text: `${response.message}\n\nGenerated files:\n${response.generatedFiles?.map((f) => `• ${f}`).join('\n') || 'None'}`,
+              text: response.message,
             },
           ];
 
@@ -961,7 +961,12 @@ User request: {{args}}
 
     if (transportType === 'sse') {
       const app = express();
-      let transport: SSEServerTransport | null = null;
+
+      // Add body parsing middleware for POST requests
+      app.use(express.json());
+
+      // Use Map to manage multiple transport instances for concurrent connections
+      const transports = new Map<string, SSEServerTransport>();
 
       app.get('/health', (req, res) => {
         res.status(200).send('OK');
@@ -969,15 +974,53 @@ User request: {{args}}
 
       app.get('/sse', async (req: express.Request, res: express.Response) => {
         console.error('New SSE connection');
-        transport = new SSEServerTransport('/messages', res);
-        await this.server.connect(transport);
+        const transport = new SSEServerTransport('/messages', res);
+
+        // Store transport by sessionId for routing
+        transports.set(transport.sessionId, transport);
+        console.error(`SSE session created: ${transport.sessionId}`);
+
+        // Clean up transport when connection closes
+        res.on('close', () => {
+          transports.delete(transport.sessionId);
+          console.error(`SSE connection closed: ${transport.sessionId}`);
+        });
+
+        try {
+          await this.server.connect(transport);
+        } catch (error) {
+          console.error(`Failed to connect transport for session ${transport.sessionId}:`, error);
+          transports.delete(transport.sessionId);
+          if (!res.headersSent) {
+            res.status(500).end();
+          }
+        }
       });
 
       app.post('/messages', async (req: express.Request, res: express.Response) => {
-        if (transport) {
-          await transport.handlePostMessage(req, res);
-        } else {
-          res.status(400).send('No active SSE session');
+        // Get sessionId from query parameter (sent by MCP client)
+        const sessionId = req.query.sessionId as string;
+
+        if (!sessionId) {
+          res.status(400).json({ error: 'Missing sessionId parameter' });
+          return;
+        }
+
+        const transport = transports.get(sessionId);
+
+        if (!transport) {
+          res.status(404).json({ error: 'Session not found' });
+          return;
+        }
+
+        try {
+          // Pass parsed body to handlePostMessage
+          await transport.handlePostMessage(req, res, req.body);
+        } catch (error) {
+          console.error(`Error handling message for session ${sessionId}:`, error);
+          if (!res.headersSent) {
+            res.status(500).json({ error: 'Internal server error' });
+          }
         }
       });
 
