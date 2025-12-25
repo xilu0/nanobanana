@@ -280,6 +280,11 @@ export class ImageGenerator {
           });
 
           console.error('DEBUG - API Response structure for variation', i + 1);
+          console.error('DEBUG - Response candidates:', JSON.stringify(response.candidates?.map(c => ({
+            finishReason: c.finishReason,
+            partsCount: c.content?.parts?.length,
+            partTypes: c.content?.parts?.map(p => p.inlineData ? 'inlineData' : p.text ? 'text' : 'unknown')
+          })), null, 2));
 
           if (response.candidates && response.candidates[0]?.content?.parts) {
             // Process image parts in the response
@@ -381,6 +386,11 @@ export class ImageGenerator {
 
     if (errorMessage.includes('quota exceeded')) {
       return 'API quota exceeded. Please check your usage and limits in the Google Cloud console.';
+    }
+
+    // Handle 429 rate limit / capacity errors
+    if (errorMessage.includes('429') || errorMessage.includes('no capacity') || errorMessage.includes('rate limit')) {
+      return `Server capacity unavailable: ${errorMessage}. Please try again later.`;
     }
 
     // Check for GoogleGenerativeAIResponseError
