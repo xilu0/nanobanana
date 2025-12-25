@@ -596,13 +596,15 @@ class NanoBananaServer {
 
             if (imageFiles.length > 0) {
               content[0].text += '\n\n**IMPORTANT - YOU MUST SAVE THE IMAGE(S) NOW**:\n' +
-                'CLI tools cannot display images inline. Execute the following command(s) to save the image(s) to the project root directory:\n\n';
+                'CLI tools cannot display images inline. Run the Bash command(s) below to save each image:\n\n';
 
-              for (const img of imageFiles) {
-                content[0].text += `\`\`\`bash\necho "${img.base64}" | base64 -d > ${img.filename}\n\`\`\`\n\n`;
+              for (let i = 0; i < imageFiles.length; i++) {
+                const img = imageFiles[i];
+                content[0].text += `**Image ${i + 1}**: \`${img.filename}\`\n`;
+                content[0].text += `\`\`\`bash\nbase64 -d << 'EOF' > ${img.filename}\n${img.base64}\nEOF\n\`\`\`\n\n`;
               }
 
-              content[0].text += 'Run the command(s) above immediately. Do NOT skip this step - the user cannot see the image until you save it.';
+              content[0].text += 'Run the command(s) above using the Bash tool immediately. The user cannot see the image until you save it.';
             }
           }
 
