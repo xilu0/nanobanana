@@ -583,7 +583,9 @@ class NanoBananaServer {
             for (const file of response.generatedFiles) {
               try {
                 const mimeType = file.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+                console.error(`DEBUG - Reading image file: ${file}`);
                 const base64Data = await FileHandler.readImageAsBase64(file);
+                console.error(`DEBUG - Base64 data length: ${base64Data.length} characters`);
 
                 content.push({
                   type: 'image',
@@ -598,6 +600,7 @@ class NanoBananaServer {
             }
           }
 
+          console.error(`DEBUG - Returning response with ${content.length} content blocks`);
           return {
             content,
           };
