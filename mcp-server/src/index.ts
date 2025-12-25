@@ -574,30 +574,35 @@ class NanoBananaServer {
             const path = await import('path');
             const { FileHandler } = await import('./fileHandler.js');
 
-            // Add instruction for client to save images - use strong directive language
-            content[0].text += '\n\n**IMPORTANT - YOU MUST SAVE THE IMAGE(S)**: ' +
-              'The image data is provided as base64 below. CLI tools cannot display images inline. ' +
-              'You MUST use the Write tool to save each image to the project root directory immediately. ' +
-              'Use a descriptive filename like `generated_red_circle.png`. ' +
-              'Do NOT skip this step - the user cannot see the image until you save it to a file.';
+            // Add instruction and base64 data for client to save images
+            const imageFiles: { filename: string; base64: string; mimeType: string }[] = [];
 
             for (const file of response.generatedFiles) {
               try {
-                const mimeType = file.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+                const ext = path.extname(file).toLowerCase();
+                const mimeType = ext === '.png' ? 'image/png' : 'image/jpeg';
                 console.error(`DEBUG - Reading image file: ${file}`);
                 const base64Data = await FileHandler.readImageAsBase64(file);
                 console.error(`DEBUG - Base64 data length: ${base64Data.length} characters`);
 
-                content.push({
-                  type: 'image',
-                  data: base64Data,
-                  mimeType: mimeType,
-                });
+                // Generate a meaningful filename from the original
+                const originalName = path.basename(file);
+                imageFiles.push({ filename: originalName, base64: base64Data, mimeType });
               } catch (error) {
                 console.error(`Failed to read image file ${file}:`, error);
-                // Don't fail the whole request if one image fails to load, just log it
                 content[0].text += `\n\nWarning: Failed to load image content for ${path.basename(file)}`;
               }
+            }
+
+            if (imageFiles.length > 0) {
+              content[0].text += '\n\n**IMPORTANT - YOU MUST SAVE THE IMAGE(S) NOW**:\n' +
+                'CLI tools cannot display images inline. Execute the following command(s) to save the image(s) to the project root directory:\n\n';
+
+              for (const img of imageFiles) {
+                content[0].text += `\`\`\`bash\necho "${img.base64}" | base64 -d > ${img.filename}\n\`\`\`\n\n`;
+              }
+
+              content[0].text += 'Run the command(s) above immediately. Do NOT skip this step - the user cannot see the image until you save it.';
             }
           }
 
