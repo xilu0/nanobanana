@@ -574,6 +574,12 @@ class NanoBananaServer {
             const path = await import('path');
             const { FileHandler } = await import('./fileHandler.js');
 
+            // Add instruction for client to save images
+            content[0].text += '\n\n**Action Required**: The generated image(s) are provided as base64 data below. ' +
+              'CLI tools (Claude Code, Gemini CLI) cannot display images inline. ' +
+              'Please save each image to the project root directory with a meaningful filename ' +
+              '(e.g., `generated_<description>.png`) so the user can view them.';
+
             for (const file of response.generatedFiles) {
               try {
                 const mimeType = file.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
